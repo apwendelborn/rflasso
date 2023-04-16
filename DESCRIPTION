@@ -9,3 +9,5 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Requires: pbmcapply, msgps
+Depends: pbmcapply, msgps
+
