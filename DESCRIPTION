@@ -8,3 +8,4 @@ Description: Builds Random Forests and then makes predictions with lasso based o
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
+Depends: pbmcapply, msgps
