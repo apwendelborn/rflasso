@@ -3,7 +3,7 @@ library("pbmcapply")
 library("msgps")
 
 
-likelihood.pca=function(splt,dep,ind,min.leaf){
+mse.num=function(splt,dep,ind,min.leaf){
   one=dep[ind>=splt]
   two=dep[ind<splt]
   test1=length(one)
@@ -16,7 +16,7 @@ likelihood.pca=function(splt,dep,ind,min.leaf){
   }
 }
 
-likelihood.cat=function(splt,dep,ind,min.leaf){
+mse.cat=function(splt,dep,ind,min.leaf){
   one=dep[ind==splt]
   two=dep[ind!=splt]
   test1=length(one)
@@ -29,7 +29,7 @@ likelihood.cat=function(splt,dep,ind,min.leaf){
   }
 }
 
-one.split=function(data,dep.name,ind.names.pca,ind.names.cat,min.leaf){
+one.split=function(data,dep.name,ind.names.num,ind.names.cat,min.leaf){
   optimal.splits=data.frame()
   dep=data[,dep.name]
   for(col in ind.names.cat){
@@ -38,14 +38,14 @@ one.split=function(data,dep.name,ind.names.pca,ind.names.cat,min.leaf){
     temp=c()
     splits=unique(ind)
     for(i in splits){
-        temp=c(temp,likelihood.cat(splt=i,dep=dep,ind=ind,min.leaf = min.leaf))
+        temp=c(temp,mse.cat(splt=i,dep=dep,ind=ind,min.leaf = min.leaf))
     }
     opt=which(temp==min(temp))
     rows=data.frame(Variable=col,splt.test=splits[opt],output=temp[opt])
     rows=rows[1,]
     optimal.splits=rbind(optimal.splits,rows)
   }
-  for(col in ind.names.pca){
+  for(col in ind.names.num){
     ind=data[,col]
     ordered=sort(ind)
     ordered=unique(ordered)
@@ -54,7 +54,7 @@ one.split=function(data,dep.name,ind.names.pca,ind.names.cat,min.leaf){
     if(length(unique(splits))<2){next}
     temp=rep(Inf,len-1)
     for(i in 1:(len-1)){
-      temp[i]=likelihood.pca(splt = splits[i],dep=dep,ind=ind,min.leaf=min.leaf)
+      temp[i]=mse.num(splt = splits[i],dep=dep,ind=ind,min.leaf=min.leaf)
     }
     opt=which(temp==min(temp))
     rows=data.frame(Variable=col,splt.test=splits[opt],output=temp[opt])
@@ -82,7 +82,7 @@ one.split=function(data,dep.name,ind.names.pca,ind.names.cat,min.leaf){
 
 
 
-rrtree=function(data,dep.name,ind.names.pca,independent.variables.categorical,num.of.ind.vars.to.sample,min.leaf){
+rrtree=function(data,dep.name,ind.names.num,independent.variables.categorical,num.of.ind.vars.to.sample,min.leaf){
   counter=1
   tree=data.frame("Variable"="No split","splt.test"=0,"Direction"="No split","Status"="Unknown","Parent"=0,"Node"=1)
 
@@ -94,11 +94,11 @@ rrtree=function(data,dep.name,ind.names.pca,independent.variables.categorical,nu
       if(tree[i,"Status"]=="End"){next}
       temp.leaf=data[indices.per.leaf[[tree[i,"Node"]]],]
       tree[i,"Terminal"]=1
-      ind.names=sample(c(ind.names.pca,independent.variables.categorical),num.of.ind.vars.to.sample,replace=FALSE)
-      splt.criteria=one.split(data=temp.leaf,dep.name=dep.name,ind.names.pca=ind.names[(ind.names %in% ind.names.pca)],ind.names.cat=ind.names[(ind.names %in% independent.variables.categorical)],min.leaf=min.leaf)
+      ind.names=sample(c(ind.names.num,independent.variables.categorical),num.of.ind.vars.to.sample,replace=FALSE)
+      splt.criteria=one.split(data=temp.leaf,dep.name=dep.name,ind.names.num=ind.names[(ind.names %in% ind.names.num)],ind.names.cat=ind.names[(ind.names %in% independent.variables.categorical)],min.leaf=min.leaf)
       if(is.null(nrow(splt.criteria))){
         if(splt.criteria=="retry"){
-          splt.criteria=one.split(data=temp.leaf,dep.name=dep.name,ind.names.pca=ind.names.pca[!(ind.names.pca %in% ind.names)],ind.names.cat=independent.variables.categorical[!(independent.variables.categorical %in% ind.names)],min.leaf=min.leaf)
+          splt.criteria=one.split(data=temp.leaf,dep.name=dep.name,ind.names.num=ind.names.num[!(ind.names.num %in% ind.names)],ind.names.cat=independent.variables.categorical[!(independent.variables.categorical %in% ind.names)],min.leaf=min.leaf)
         }
       }
       if(is.null(nrow(splt.criteria))){
@@ -168,11 +168,11 @@ leaf.data=function(data, temp.tree, leaf.criteria,indices.per.leaf){
 
 
 
-tree.coordinator=function(i,training.data,dependent.variables,independent.variables.pca,independent.variables.categorical,samples.per.tree,number.of.independent.variables.to.sample,cat.levels,indices,minimum.leaf.size){
+tree.coordinator=function(i,training.data,dependent.variables,independent.variables.num,independent.variables.categorical,samples.per.tree,number.of.independent.variables.to.sample,cat.levels,indices,minimum.leaf.size){
   sample.row.numbers=sample(nrow(training.data),samples.per.tree,replace=TRUE)
   samp=training.data[sample.row.numbers,]
   min.leaf=minimum.leaf.size
-  to.output=(rrtree(data=samp,dep.name=dependent.variables,ind.names.pca = independent.variables.pca,independent.variables.categorical=independent.variables.categorical,num.of.ind.vars.to.sample=number.of.independent.variables.to.sample,min.leaf = min.leaf))
+  to.output=(rrtree(data=samp,dep.name=dependent.variables,ind.names.num = independent.variables.num,independent.variables.categorical=independent.variables.categorical,num.of.ind.vars.to.sample=number.of.independent.variables.to.sample,min.leaf = min.leaf))
   if(is.vector(indices)){
     to.output[["index"]]=indices[sample.row.numbers]
   }else{
@@ -230,7 +230,7 @@ build.tree=function(training.data,dependent.variable,independent.variables,sampl
   dimnames(train)[[2]][1]="index"
   index=training.data[,index.columns]
   index=cbind(idx,index)
-  trees=pbmclapply(tree.index,tree.coordinator,mc.cores=number.of.cores,training.data=train,dependent.variables=dependent.variable,independent.variables.pca=independent.variables.numerical,independent.variables.categorical=independent.variables.categorical,samples.per.tree=samples.per.tree,number.of.independent.variables.to.sample=number.of.independent.variables.to.sample,indices=index,minimum.leaf.size=minimum.leaf.size)
+  trees=pbmclapply(tree.index,tree.coordinator,mc.cores=number.of.cores,training.data=train,dependent.variables=dependent.variable,independent.variables.num=independent.variables.numerical,independent.variables.categorical=independent.variables.categorical,samples.per.tree=samples.per.tree,number.of.independent.variables.to.sample=number.of.independent.variables.to.sample,indices=index,minimum.leaf.size=minimum.leaf.size)
   model=list(trees=trees,data.as.matrix=train,original.data=training.data,dependent.variable=dependent.variable,independent.variables.numerical=independent.variables.numerical,independent.variables.categorical=independent.variables.categorical,categorical.levels=cat.levels,index.columns=index.columns)
   oob.indices=out.of.bag.tree.indices(bagged.model = model)
   model[["oob.indices"]]=oob.indices
@@ -289,7 +289,7 @@ subset.from.ensemble=function(bagged.model,case,oob.indices){
 }
 
 
-predictor=function(training.data,newdata,categorical.variables,pca.variables,dependent.variable,model,predictions.only,categorical.levels){
+predictor=function(training.data,newdata,categorical.variables,num.variables,dependent.variable,model,predictions.only,categorical.levels){
   n.cat=c()
   d.cat=c()
   newdata=t(newdata)
@@ -309,9 +309,9 @@ predictor=function(training.data,newdata,categorical.variables,pca.variables,dep
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
     n.cat=d.cat[1,-1]
-    xs=cbind(d.cat[-1,-1],training.data[,pca.variables])
+    xs=cbind(d.cat[-1,-1],training.data[,num.variables])
   }else if(length(n.cat)==0){
-    xs=training.data[,pca.variables]
+    xs=training.data[,num.variables]
   }else{
     cat=rbind(newdata[,n.cat],training.data[,n.cat])
     cat=data.frame(cat)
@@ -324,10 +324,10 @@ predictor=function(training.data,newdata,categorical.variables,pca.variables,dep
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
     n.cat=d.cat[1,-1]
-    xs=cbind(d.cat[-1,-1],training.data[,pca.variables])
+    xs=cbind(d.cat[-1,-1],training.data[,num.variables])
   }
-  new=as.matrix(c(1,n.cat,newdata[,pca.variables]))
-  names(new)=c(n.cat,pca.variables)
+  new=as.matrix(c(1,n.cat,newdata[,num.variables]))
+  names(new)=c(n.cat,num.variables)
   mod=msgps(X=xs,y=y,penalty = "enet",alpha=0)
   pred=t(new) %*% mod$dfgcv_result$coef
   if(predictions.only==TRUE){
@@ -336,7 +336,7 @@ predictor=function(training.data,newdata,categorical.variables,pca.variables,dep
     resid=cbind(rep(1,nrow(xs)),xs) %*% mod$dfgcv_result$coef - y
     rmse=mean((resid)^2)^(1/2)
     coef=data.frame(t(mod$dfgcv_result$coef))
-    names(coef)=c("Intercept",dimnames(d.cat)[[2]][-1],pca.variables)
+    names(coef)=c("Intercept",dimnames(d.cat)[[2]][-1],num.variables)
     return(list(prediction=pred,coefs=t(coef),rmse.error.of.lasso.model=rmse))
   }
 }
@@ -354,10 +354,10 @@ prediction.coordinator=function(i,bagged.model,validation.data,labels=NULL,model
       cat=c(cat,z)
     }
   }
-  if(model=="Average"){
+  if(model=="average"){
     ret=list(prediction=mean(t.data[,bagged.model$dependent.variable]))
   }else{
-    ret=predictor(training.data=t.data,newdata=observation,categorical.variables=cat,pca.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,model=model,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
+    ret=predictor(training.data=t.data,newdata=observation,categorical.variables=cat,num.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,model=model,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
   }
   if(!is.null(labels)){
     for(p in names(labels)){
@@ -421,7 +421,7 @@ leaf.data.pruning=function(data, temp.tree, leaf.criteria){
   return(data[aux,])
 }
 
-prune.tree=function(tree.object,out.of.samp.data,sign.level,dep.name){
+prune.tree=function(tree.object,samp.data,sign.level,dep.name){
   tree=tree.object$tree.table
   tree["Optimized"]="Unknown"
   agg=aggregate(tree$Terminal,by=list(Parent=tree$Parent),FUN=sum)
@@ -431,8 +431,8 @@ prune.tree=function(tree.object,out.of.samp.data,sign.level,dep.name){
       parent=tree[tree$Node==i,]
       children=tree[tree$Parent==i,]
       if(all(children$Optimized=="End")){next}
-      one.leaf.os=leaf.data.pruning(data=out.of.samp.data,temp.tree=tree,leaf.criteria = children[1,])
-      two.leaf.os=leaf.data.pruning(data=out.of.samp.data,temp.tree=tree,leaf.criteria = children[2,])
+      one.leaf.os=leaf.data.pruning(data=samp.data,temp.tree=tree,leaf.criteria = children[1,])
+      two.leaf.os=leaf.data.pruning(data=samp.data,temp.tree=tree,leaf.criteria = children[2,])
 
       if(is.null(nrow(one.leaf.os))|is.null(nrow(two.leaf.os))){
         tree=tree[tree$Parent!=i,]
@@ -446,7 +446,6 @@ prune.tree=function(tree.object,out.of.samp.data,sign.level,dep.name){
       one=one.leaf.os[,dep.name]
       two=two.leaf.os[,dep.name]
       combined=c(one,two)
-
 
       if((var(one)*(length(one)-1)+var(two)*(length(two)-1))*sign.level<(var(combined)*(length(combined)-1))){
         tree[tree$Parent==i,"Optimized"]="End"
@@ -473,8 +472,8 @@ prune.tree=function(tree.object,out.of.samp.data,sign.level,dep.name){
 }
 
 pruning.coordinator=function(i,bagged.model,sig.level){
-  out.samp=bagged.model$data.as.matrix
-  pruned.tree=prune.tree(tree.object=bagged.model$trees[[i]],out.of.samp.data=out.samp,sign.level=sig.level,dep.name=bagged.model$dependent.variable)
+  samp=bagged.model$data.as.matrix
+  pruned.tree=prune.tree(tree.object=bagged.model$trees[[i]],samp.data=samp,sign.level=sig.level,dep.name=bagged.model$dependent.variable)
   return(pruned.tree)
 }
 
@@ -506,22 +505,22 @@ auto.optimize=function(bagged.model,step.size=.025,guess=1.1,number.of.cores){
     }
     size=mean(tree.size)
     error=out.of.bag.error(bagged.model=temp.model,model="lasso",number.of.cores=number.of.cores)
-    to.add=data.frame("Significance"=sig,"RMSE"=error,"Tree Size"=size)
+    to.add=data.frame("Penalty"=sig,"RMSE"=error,"Tree Size"=size)
     error.recording=rbind(error.recording,to.add)
     print(error.recording)
   }
   last.error=Inf
   if(error.recording[2,"RMSE"]==min(error.recording[,"RMSE"])){
-    print(paste("Optimal significance level: ",as.character(error.recording[2,"Significance"]),sep=""))
-    return(pruning.parallel(bagged.model=bagged.model,sig.level=error.recording[2,"Significance"],number.of.cores=number.of.cores))
+    print(paste("Optimal penalty level: ",as.character(error.recording[2,"Penalty"]),sep=""))
+    return(pruning.parallel(bagged.model=bagged.model,sig.level=error.recording[2,"Penalty"],number.of.cores=number.of.cores))
   }
   most.recent=min(error.recording[,"RMSE"])
   if(error.recording[1,"RMSE"]==min(error.recording[,"RMSE"])){
     direction="Down"
-    sign.level=error.recording[1,"Significance"]
+    sign.level=error.recording[1,"Penalty"]
   }else if(error.recording[3,"RMSE"]==min(error.recording[,"RMSE"])){
     direction="Up"
-    sign.level=error.recording[3,"Significance"]
+    sign.level=error.recording[3,"Penalty"]
   }else{break}
 
   while(last.error>most.recent){
@@ -538,7 +537,7 @@ auto.optimize=function(bagged.model,step.size=.025,guess=1.1,number.of.cores){
     }
     size=mean(tree.size)
     error=out.of.bag.error(bagged.model=temp.model,model="lasso",number.of.cores=number.of.cores)
-    to.add=data.frame("Significance"=sign.level,"RMSE"=error,"Tree Size"=size)
+    to.add=data.frame("Penalty"=sign.level,"RMSE"=error,"Tree Size"=size)
     error.recording=rbind(error.recording,to.add)
     print(error.recording)
     most.recent=error
@@ -552,9 +551,9 @@ auto.optimize=function(bagged.model,step.size=.025,guess=1.1,number.of.cores){
     tree.size=c(tree.size,nrow(bagged.model$trees[[i]]$tree.table))
   }
   size=mean(tree.size)
-  to.add=data.frame("Significance"=-1,"RMSE"=error,"Tree Size"=size)
-  print(paste("Optimal significance level: ",error.recording[error.recording[,"RMSE"]==min(error.recording[,"RMSE"]),"Significance"],sep=""))
-  return(pruning.parallel(bagged.model=bagged.model,sig.level=error.recording[error.recording[,"RMSE"]==min(error.recording[,"RMSE"]),"Significance"],number.of.cores=number.of.cores))
+  to.add=data.frame("Penalty"=-1,"RMSE"=error,"Tree Size"=size)
+  print(paste("Optimal penalty level: ",error.recording[error.recording[,"RMSE"]==min(error.recording[,"RMSE"]),"Penalty"],sep=""))
+  return(pruning.parallel(bagged.model=bagged.model,sig.level=error.recording[error.recording[,"RMSE"]==min(error.recording[,"RMSE"]),"Penalty"],number.of.cores=number.of.cores))
 }
 
 
