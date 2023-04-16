@@ -17,10 +17,11 @@ number.of.trees,index.columns=NULL)
   \item{training.data}{Accepts R data.frames as an input.}
   \item{dependent.variable}{Name of column from training.data with the dependent variable.}
   \item{independent.variables}{Vector of names of columns from training.data with the independent variables.}
-  \item{samples.per.tree}{Number of samples per tree in the Random Forest ensemble.}
+  \item{samples.per.tree}{Number of samples per tree in the random forest ensemble.}
   \item{minimum.leaf.size}{Minimum size of terminal leaves.}
   \item{number.of.independent.variables.to.sample}{Number of variables to sample at each split.}
-  \item{number.of.cores}{Number of cores to use when fitting the Random Forest.}
+  \item{number.of.cores}{Number of cores to use when fitting the random forest.}
+  \item{number.of.trees}{Number of trees to build for the random forest ensemble.}
   \item{index.columns}{Useful for labelling predictions. These columns are not used in fitting the random forest and should uniquely identify samples.}
 }
 \value{
