@@ -1,10 +1,10 @@
 Package: rflasso
 Type: Package
-Title: Random Forest with Lasso
+Title: Random Forest with Lasso - Regression
 Version: 1.0.0
 Author: Alexander Wendelborn
 Maintainer: Alexander Wendelborn <apwendelborn@gmail.com>
-Description: Builds Random Forests and then makes predictions with lasso based on pooled samples from the terminal leaves
+Description: Builds regression random forests and then makes predictions with lasso based on pooled samples from the terminal nodes
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
