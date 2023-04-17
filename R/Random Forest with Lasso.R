@@ -326,18 +326,39 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     n.cat=d.cat[1,-1]
     xs=cbind(d.cat[-1,-1],training.data[,num.variables])
   }
-  new=as.matrix(c(1,n.cat,newdata[,num.variables]))
+  name=c(dimnames(d.cat)[[2]][-1],num.variables)
+  dimnames(xs)[[2]]=name
+  for(col in length(name):1){
+    test=xs[,col]
+    if(any(is.na(test)) | (length(unique(test))==1)){
+      name=name[-col]
+      xs=xs[,-col]
+    }
+  }
+  new=t(as.matrix(c(n.cat,newdata[,num.variables])))
   names(new)=c(n.cat,num.variables)
-  mod=msgps(X=xs,y=y,penalty = "enet",alpha=0)
-  pred=t(new) %*% mod$dfgcv_result$coef
+  new=new[,name]
+  new=matrix(data=new,nrow=1)
+  xs=rbind(new,xs)
+  s.xs=scale(xs,center=TRUE,scale=TRUE)
+  new=s.xs[1,]
+  s.xs=s.xs[-1,]
+  mod=msgps(X=s.xs,y=y,penalty = "enet",alpha=0)
+  new=c(1,new)
+  new=matrix(data=new,nrow=1)
+  print(new)
+  print(mod$dfgcv_result$coef)
+  pred=new %*% mod$dfgcv_result$coef
   if(predictions.only==TRUE){
     return(list(prediction=pred))
   }else{
-    resid=cbind(rep(1,nrow(xs)),xs) %*% mod$dfgcv_result$coef - y
+    s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
+    resid=s.xs %*% mod$dfgcv_result$coef - y
+    print(resid)
     rmse=mean((resid)^2)^(1/2)
     coef=data.frame(t(mod$dfgcv_result$coef))
-    names(coef)=c("Intercept",dimnames(d.cat)[[2]][-1],num.variables)
-    return(list(prediction=pred,coefs=t(coef),rmse.error.of.lasso.model=rmse))
+    names(coef)=c("Intercept",name)
+    return(list(prediction=pred,standardized.coefs=t(coef),rmse.error.of.lasso.model=rmse))
   }
 }
 
