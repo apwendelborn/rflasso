@@ -1,6 +1,6 @@
 
 library("pbmcapply")
-library("msgps")
+library("glmnet")
 
 
 mse.num=function(splt,dep,ind,min.leaf){
@@ -289,11 +289,11 @@ subset.from.ensemble=function(bagged.model,case,oob.indices){
 }
 
 
-predictor=function(training.data,newdata,categorical.variables,num.variables,dependent.variable,model,predictions.only,categorical.levels){
+predictor=function(training.data,newdata,categorical.variables,num.variables,dependent.variable,predictions.only,categorical.levels){
   n.cat=c()
   d.cat=c()
   newdata=t(newdata)
-  y=training.data[,dependent.variable]
+
   for(q in categorical.variables){
     if(newdata[,q] %in% training.data[,q]){
       n.cat=c(n.cat,q)
@@ -308,7 +308,7 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     levels(cat[,1])=categorical.levels[[n.cat]]
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
-    n.cat=d.cat[1,-1]
+    new.cat=d.cat[1,-1]
     xs=cbind(d.cat[-1,-1],training.data[,num.variables])
   }else if(length(n.cat)==0){
     xs=training.data[,num.variables]
@@ -323,7 +323,7 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     }
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
-    n.cat=d.cat[1,-1]
+    new.cat=d.cat[1,-1]
     xs=cbind(d.cat[-1,-1],training.data[,num.variables])
   }
   name=c(dimnames(d.cat)[[2]][-1],num.variables)
@@ -335,30 +335,38 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
       xs=xs[,-col]
     }
   }
-  new=t(as.matrix(c(n.cat,newdata[,num.variables])))
-  names(new)=c(n.cat,num.variables)
+  new=t(as.matrix(c(new.cat,newdata[,num.variables])))
+
   new=new[,name]
-  new=matrix(data=new,nrow=1)
-  xs=rbind(new,xs)
-  s.xs=scale(xs,center=TRUE,scale=TRUE)
-  new=s.xs[1,]
-  s.xs=s.xs[-1,]
-  mod=msgps(X=s.xs,y=y,penalty = "enet",alpha=0)
-  new=c(1,new)
-  new=matrix(data=new,nrow=1)
-  print(new)
-  print(mod$dfgcv_result$coef)
-  pred=new %*% mod$dfgcv_result$coef
+  weights=aggregate(x=data.frame(training.data)$index,by=list(iter=data.frame(training.data)$index),FUN=length)
+  short.xs=matrix(nrow=1,ncol=length(name))
+  short.y=c()
+  for(q in weights$iter){
+    if(weights[weights$iter==q,"x"]==1){
+      one=xs[training.data[,"index"]==q,]
+      short.xs=rbind(short.xs,one)
+      short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
+    }else{
+      one=xs[training.data[,"index"]==q,][1,]
+      short.xs=rbind(short.xs,one)
+      short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
+    }
+  }
+  short.xs=short.xs[-1,]
+  mod=cv.glmnet(x=short.xs,y=short.y,family="gaussian",nfolds=7,alpha=1,weights=weights[,"x"],standardize=TRUE,intercept=TRUE,parallel=FALSE)
+
+  pred=predict(object=mod,newx=new,s=mod$lambda.min,type="link")
+  print(pred)
   if(predictions.only==TRUE){
     return(list(prediction=pred))
   }else{
-    s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
-    resid=s.xs %*% mod$dfgcv_result$coef - y
+    #s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
+    resid=as.vector(predict(object=mod,newx=xs)) - training.data[,dependent.variable]
     print(resid)
     rmse=mean((resid)^2)^(1/2)
-    coef=data.frame(t(mod$dfgcv_result$coef))
-    names(coef)=c("Intercept",name)
-    return(list(prediction=pred,standardized.coefs=t(coef),rmse.error.of.lasso.model=rmse))
+    coef=data.frame(as.matrix(coef(mod,s=mod$lambda.min)))
+    #names(coef)=c("Intercept",name)
+    return(list(prediction=pred,coefs=coef,rmse.error.of.lasso.model=rmse))
   }
 }
 
@@ -378,7 +386,7 @@ prediction.coordinator=function(i,bagged.model,validation.data,labels=NULL,model
   if(model=="average"){
     ret=list(prediction=mean(t.data[,bagged.model$dependent.variable]))
   }else{
-    ret=predictor(training.data=t.data,newdata=observation,categorical.variables=cat,num.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,model=model,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
+    ret=predictor(training.data=t.data,newdata=observation,categorical.variables=cat,num.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
   }
   if(!is.null(labels)){
     for(p in names(labels)){

@@ -8,6 +8,6 @@ Description: Builds regression random forests and then makes predictions with la
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Requires: pbmcapply, msgps
-Depends: pbmcapply, msgps
+Requires: pbmcapply, glmnet
+Depends: pbmcapply, glmnet
 

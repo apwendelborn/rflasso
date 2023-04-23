@@ -5,7 +5,7 @@
 Out of Bag Error for rflasso
 }
 \description{
-Calculate the aggregate RMSE for each sample in the training dataset by using the out of bag random forest. This function supports either using lasso on the pooled leaves or simple averaging.
+Calculate the aggregate RMSE for each sample in the training dataset by using the out of bag random forest. This function supports either using lasso on the pooled terminal nodes or simple averaging.
 }
 \usage{
 out.of.bag.error(bagged.model,model="lasso",number.of.cores)
@@ -27,7 +27,7 @@ Alexander Wendelborn
 }
 
 \note{
-Lasso is tuned by GCV using the "msgps" package. This function is useful for determining whether the standard random forest predictions or lasso based on pooled leaves will perform better on out of sample data.
+Lasso is tuned by 7 fold cross validation using the "glmnet" package. This function is useful for determining whether the standard random forest predictions or lasso based on pooled terminal nodes will perform better on out of sample data.
 }
 
 %% ~Make other sections like Warning with \section{Warning }{....} ~
