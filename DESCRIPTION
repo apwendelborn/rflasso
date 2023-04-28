@@ -5,7 +5,7 @@ Version: 1.0.0
 Author: Alexander Wendelborn
 Maintainer: Alexander Wendelborn <apwendelborn@gmail.com>
 Description: Builds regression random forests and then makes predictions with lasso based on pooled samples from the terminal nodes
-License: MIT + file LICENSE
+License: 
 Encoding: UTF-8
 LazyData: true
 Requires: pbmcapply, glmnet
