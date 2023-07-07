@@ -266,41 +266,44 @@ subset.from.case=function(tree.object,data,case){
       }
     }
   }
-  return(data[tree.object$index[,"idx"],][tree.object$indices.per.leaf[[current.node[1,"Node"]]],])
+  return(tree.object$indices.per.leaf[[current.node[1,"Node"]]])
 }
 
 
 
 subset.from.ensemble=function(bagged.model,case,oob.indices){
-  return=matrix(ncol=dim(bagged.model$data.as.matrix)[2])
+  return=c()
   if(is.null(oob.indices)){
     for(i in 1:length(bagged.model$trees)){
       sub=subset.from.case(tree.object = bagged.model$trees[[i]],data=bagged.model$data.as.matrix,case=case)
-      return=rbind(return,sub)
+      return=c(return,sub)
     }
-    return(return[-1,])
+    return(return)
   }else{
     for(i in oob.indices){
       sub=subset.from.case(tree.object = bagged.model$trees[[i]],data=bagged.model$data.as.matrix,case=case)
-      return=rbind(return,sub)
+      return=c(return,sub)
     }
-    return(return[-1,])
+    return(return)
   }
 }
 
 
-predictor=function(training.data,newdata,categorical.variables,num.variables,dependent.variable,predictions.only,categorical.levels){
+predictor=function(training.data,newdata,original.data,categorical.variables,num.variables,dependent.variable,predictions.only,categorical.levels){
   n.cat=c()
   d.cat=c()
   newdata=t(newdata)
-
-  for(q in categorical.variables){
-    if(newdata[,q] %in% training.data[,q]){
-      n.cat=c(n.cat,q)
+  print(training.data)
+  unique.rows=original.data[unique(training.data),]
+  ys=unique.rows[,dependent.variable]
+  for(z in categorical.variables){
+    if((length(unique(unique.rows[,z]))!=1)&(newdata[,z] %in% unique.rows[,z])){
+      n.cat=c(n.cat,z)
     }
   }
+
   if(length(n.cat)==1){
-    cat=rbind(newdata[,n.cat],training.data[,n.cat])
+    cat=rbind(newdata[,n.cat],unique.rows[,n.cat])
     cat=data.frame(cat)
     cat[is.na(cat)]=0
     names(cat)[1]=n.cat
@@ -309,11 +312,11 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
     new.cat=d.cat[1,-1]
-    xs=cbind(d.cat[-1,-1],training.data[,num.variables])
+    xs=cbind(d.cat[-1,-1],unique.rows[,num.variables])
   }else if(length(n.cat)==0){
-    xs=training.data[,num.variables]
+    xs=unique.rows[,num.variables]
   }else{
-    cat=rbind(newdata[,n.cat],training.data[,n.cat])
+    cat=rbind(newdata[,n.cat],unique.rows[,n.cat])
     cat=data.frame(cat)
     cat[is.na(cat)]=0
     names(cat)=n.cat
@@ -324,7 +327,7 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
     new.cat=d.cat[1,-1]
-    xs=cbind(d.cat[-1,-1],training.data[,num.variables])
+    xs=cbind(d.cat[-1,-1],unique.rows[,num.variables])
   }
   name=c(dimnames(d.cat)[[2]][-1],num.variables)
   dimnames(xs)[[2]]=name
@@ -338,22 +341,22 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
   new=t(as.matrix(c(new.cat,newdata[,num.variables])))
 
   new=new[,name]
-  weights=aggregate(x=data.frame(training.data)$index,by=list(iter=data.frame(training.data)$index),FUN=length)
-  short.xs=matrix(nrow=1,ncol=length(name))
-  short.y=c()
-  for(q in weights$iter){
-    if(weights[weights$iter==q,"x"]==1){
-      one=xs[training.data[,"index"]==q,]
-      short.xs=rbind(short.xs,one)
-      short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
-    }else{
-      one=xs[training.data[,"index"]==q,][1,]
-      short.xs=rbind(short.xs,one)
-      short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
-    }
-  }
-  short.xs=short.xs[-1,]
-  mod=cv.glmnet(x=short.xs,y=short.y,family="gaussian",nfolds=7,alpha=1,weights=weights[,"x"],standardize=TRUE,intercept=TRUE,parallel=FALSE)
+  weights=aggregate(x=training.data,by=list(iter=training.data),FUN=length)
+  #short.xs=matrix(nrow=1,ncol=length(name))
+  #short.y=c()
+  #for(q in weights$iter){
+  #  if(weights[weights$iter==q,"x"]==1){
+  #    one=xs[training.data[,"index"]==q,]
+  #    short.xs=rbind(short.xs,one)
+  #    short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
+  #  }else{
+  #    one=xs[training.data[,"index"]==q,][1,]
+  #    short.xs=rbind(short.xs,one)
+  #    short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
+  #  }
+  #}
+  #short.xs=short.xs[-1,]
+  mod=cv.glmnet(x=xs,y=ys,family="gaussian",nfolds=7,alpha=1,weights=weights[,"x"],standardize=TRUE,intercept=TRUE,parallel=FALSE)
 
   pred=predict(object=mod,newx=new,s=mod$lambda.min,type="link")
   print(pred)
@@ -361,7 +364,7 @@ predictor=function(training.data,newdata,categorical.variables,num.variables,dep
     return(list(prediction=pred))
   }else{
     #s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
-    resid=as.vector(predict(object=mod,newx=xs)) - training.data[,dependent.variable]
+    resid=as.vector(predict(object=mod,newx=xs)) - ys
     print(resid)
     rmse=mean((resid)^2)^(1/2)
     coef=data.frame(as.matrix(coef(mod,s=mod$lambda.min)))
@@ -377,16 +380,11 @@ prediction.coordinator=function(i,bagged.model,validation.data,labels=NULL,model
     indices=oob.indices[[i]]
   }else{indices=NULL}
   t.data=subset.from.ensemble(bagged.model = bagged.model, case = observation,oob.indices=indices)
-  cat=c()
-  for(z in bagged.model$independent.variables.categorical){
-    if(length(unique(t.data[,z]))!=1){
-      cat=c(cat,z)
-    }
-  }
+
   if(model=="average"){
-    ret=list(prediction=mean(t.data[,bagged.model$dependent.variable]))
+    ret=list(prediction=mean(bagged.model$data.as.matrix[t.data,bagged.model$dependent.variable]))
   }else{
-    ret=predictor(training.data=t.data,newdata=observation,categorical.variables=cat,num.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
+    ret=predictor(training.data=t.data,original.data=bagged.model$data.as.matrix,newdata=observation,categorical.variables=bagged.model$independent.variables.categorical,num.variables=bagged.model$independent.variables.numerical,dependent.variable=bagged.model$dependent.variable,predictions.only=predictions.only,categorical.levels=bagged.model$categorical.levels)
   }
   if(!is.null(labels)){
     for(p in names(labels)){
