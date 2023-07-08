@@ -293,15 +293,13 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
   n.cat=c()
   d.cat=c()
   newdata=t(newdata)
-  print(training.data)
-  unique.rows=original.data[unique(training.data),]
+  unique.rows=original.data[unique(training.data)[order(unique(training.data))],]
   ys=unique.rows[,dependent.variable]
   for(z in categorical.variables){
     if((length(unique(unique.rows[,z]))!=1)&(newdata[,z] %in% unique.rows[,z])){
       n.cat=c(n.cat,z)
     }
   }
-
   if(length(n.cat)==1){
     cat=rbind(newdata[,n.cat],unique.rows[,n.cat])
     cat=data.frame(cat)
@@ -342,6 +340,7 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
 
   new=new[,name]
   weights=aggregate(x=training.data,by=list(iter=training.data),FUN=length)
+
   #short.xs=matrix(nrow=1,ncol=length(name))
   #short.y=c()
   #for(q in weights$iter){
@@ -359,20 +358,17 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
   mod=cv.glmnet(x=xs,y=ys,family="gaussian",nfolds=7,alpha=1,weights=weights[,"x"],standardize=TRUE,intercept=TRUE,parallel=FALSE)
 
   pred=predict(object=mod,newx=new,s=mod$lambda.min,type="link")
-  print(pred)
   if(predictions.only==TRUE){
     return(list(prediction=pred))
   }else{
     #s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
     resid=as.vector(predict(object=mod,newx=xs)) - ys
-    print(resid)
     rmse=mean((resid)^2)^(1/2)
     coef=data.frame(as.matrix(coef(mod,s=mod$lambda.min)))
     #names(coef)=c("Intercept",name)
     return(list(prediction=pred,coefs=coef,rmse.error.of.lasso.model=rmse))
   }
 }
-
 
 prediction.coordinator=function(i,bagged.model,validation.data,labels=NULL,model,predictions.only,oob.indices=NULL){
   observation=validation.data[i,]
