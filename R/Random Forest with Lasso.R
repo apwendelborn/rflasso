@@ -41,6 +41,7 @@ one.split=function(data,dep.name,ind.names.num,ind.names.cat,min.leaf){
         temp=c(temp,mse.cat(splt=i,dep=dep,ind=ind,min.leaf = min.leaf))
     }
     opt=which(temp==min(temp))
+
     rows=data.frame(Variable=col,splt.test=splits[opt],output=temp[opt])
     rows=rows[1,]
     optimal.splits=rbind(optimal.splits,rows)
@@ -57,6 +58,7 @@ one.split=function(data,dep.name,ind.names.num,ind.names.cat,min.leaf){
       temp[i]=mse.num(splt = splits[i],dep=dep,ind=ind,min.leaf=min.leaf)
     }
     opt=which(temp==min(temp))
+
     rows=data.frame(Variable=col,splt.test=splits[opt],output=temp[opt])
     rows=rows[1,]
     optimal.splits=rbind(optimal.splits,rows)
@@ -224,6 +226,9 @@ build.tree=function(training.data,dependent.variable,independent.variables,sampl
     train[,cat]=as.numeric(factor(train[,cat],levels=cat.levels[[cat]]))
     train[is.na(train[,cat]),cat]=-1
   }
+  for(num in independent.variables.numerical){
+    train[is.na(train[,num]),num]=mean(train[,num],na.rm=TRUE)
+  }
   train=as.matrix(train[,c(dependent.variable,independent.variables.numerical,independent.variables.categorical)])
   idx=1:nrow(train)
   train=cbind(idx,train)
@@ -306,7 +311,12 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
     cat[is.na(cat)]=0
     names(cat)[1]=n.cat
     cat[,1]=as.factor(cat[,1])
-    levels(cat[,1])=categorical.levels[[n.cat]]
+
+    if(any(is.na(categorical.levels[[n.cat]]))){
+      levels(cat[,1])=c(categorical.levels[[n.cat]],"None")
+      cat[is.na(cat[,1]),1]="None"
+    }else{levels(cat[,1])=categorical.levels[n.cat]}
+
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
     new.cat=d.cat[1,-1]
@@ -320,9 +330,13 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
     names(cat)=n.cat
     for(i in n.cat){
       cat[,i]=as.factor(cat[,i])
-      levels(cat[,i])=categorical.levels[[i]]
+      if(any(is.na(categorical.levels[[i]]))){
+        levels(cat[,i])=c(categorical.levels[[i]],"None")
+        cat[is.na(cat[,i]),i]="None"
+      }else{levels(cat[,i])=categorical.levels[[i]]}
     }
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
+
     d.cat=model.matrix(f,cat)
     new.cat=d.cat[1,-1]
     xs=cbind(d.cat[-1,-1],unique.rows[,num.variables])
@@ -340,35 +354,18 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
 
   new=new[,name]
   weights=aggregate(x=training.data,by=list(iter=training.data),FUN=length)
-
-  #short.xs=matrix(nrow=1,ncol=length(name))
-  #short.y=c()
-  #for(q in weights$iter){
-  #  if(weights[weights$iter==q,"x"]==1){
-  #    one=xs[training.data[,"index"]==q,]
-  #    short.xs=rbind(short.xs,one)
-  #    short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
-  #  }else{
-  #    one=xs[training.data[,"index"]==q,][1,]
-  #    short.xs=rbind(short.xs,one)
-  #    short.y=c(short.y,training.data[training.data[,"index"]==q,dependent.variable][1])
-  #  }
-  #}
-  #short.xs=short.xs[-1,]
   mod=cv.glmnet(x=xs,y=ys,family="gaussian",nfolds=7,alpha=1,weights=weights[,"x"],standardize=TRUE,intercept=TRUE,parallel=FALSE)
-
   pred=predict(object=mod,newx=new,s=mod$lambda.min,type="link")
   if(predictions.only==TRUE){
     return(list(prediction=pred))
   }else{
-    #s.xs=cbind(rep(1,nrow(s.xs)),s.xs)
     resid=as.vector(predict(object=mod,newx=xs)) - ys
     rmse=mean((resid)^2)^(1/2)
     coef=data.frame(as.matrix(coef(mod,s=mod$lambda.min)))
-    #names(coef)=c("Intercept",name)
     return(list(prediction=pred,coefs=coef,rmse.error.of.lasso.model=rmse))
   }
 }
+
 
 prediction.coordinator=function(i,bagged.model,validation.data,labels=NULL,model,predictions.only,oob.indices=NULL){
   observation=validation.data[i,]
@@ -398,6 +395,9 @@ predict.lm.from.rf=function(bagged.model,newdata,model="lasso",predictions.only=
   for(cat in bagged.model$independent.variables.categorical){
     new[,cat]=as.numeric(factor(new[,cat],levels=cat.levels[[cat]]))
     new[is.na(new[,cat]),cat]=-1
+  }
+  for(num in bagged.model$independent.variables.numerical){
+    new[is.na(new[,num]),num]=mean(bagged.model$data.as.matrix[,num],na.rm=TRUE)
   }
   new=as.matrix(new[,c(bagged.model$dependent.variables,bagged.model$independent.variables.numerical,bagged.model$independent.variables.categorical)])
   if(all(bagged.model$index.columns %in% names(newdata))){
