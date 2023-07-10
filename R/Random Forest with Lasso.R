@@ -315,7 +315,7 @@ predictor=function(training.data,newdata,original.data,categorical.variables,num
     if(any(is.na(categorical.levels[[n.cat]]))){
       levels(cat[,1])=c(categorical.levels[[n.cat]],"None")
       cat[is.na(cat[,1]),1]="None"
-    }else{levels(cat[,1])=categorical.levels[n.cat]}
+    }else{levels(cat[,1])=categorical.levels[[n.cat]]}
 
     f=as.formula(paste("~",paste(n.cat,collapse=" + ")))
     d.cat=model.matrix(f,cat)
@@ -403,7 +403,7 @@ predict.lm.from.rf=function(bagged.model,newdata,model="lasso",predictions.only=
   if(all(bagged.model$index.columns %in% names(newdata))){
     indices=newdata[,bagged.model$index.columns]
   }else{indices=NULL}
-  details=pbmclapply(iter,prediction.coordinator,mc.cores=number.of.cores,validation.data=new,bagged.model=bagged.model,labels=indices,model=model,predictions.only=predictions.only)
+    details=pbmclapply(iter,prediction.coordinator,mc.cores=number.of.cores,validation.data=new,bagged.model=bagged.model,labels=indices,model=model,predictions.only=predictions.only)
   return(details)
 }
 
