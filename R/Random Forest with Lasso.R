@@ -399,11 +399,11 @@ predict.lm.from.rf=function(bagged.model,newdata,model="lasso",predictions.only=
   for(num in bagged.model$independent.variables.numerical){
     new[is.na(new[,num]),num]=mean(bagged.model$data.as.matrix[,num],na.rm=TRUE)
   }
-  new=as.matrix(new[,c(bagged.model$dependent.variables,bagged.model$independent.variables.numerical,bagged.model$independent.variables.categorical)])
+  new=as.matrix(new[,c(bagged.model$independent.variables.numerical,bagged.model$independent.variables.categorical)])
   if(all(bagged.model$index.columns %in% names(newdata))){
     indices=newdata[,bagged.model$index.columns]
   }else{indices=NULL}
-    details=pbmclapply(iter,prediction.coordinator,mc.cores=number.of.cores,validation.data=new,bagged.model=bagged.model,labels=indices,model=model,predictions.only=predictions.only)
+  details=pbmclapply(iter,prediction.coordinator,mc.cores=number.of.cores,validation.data=new,bagged.model=bagged.model,labels=indices,model=model,predictions.only=predictions.only)
   return(details)
 }
 
