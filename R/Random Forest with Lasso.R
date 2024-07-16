@@ -271,7 +271,11 @@ subset.from.case=function(tree.object,data,case){
       }
     }
   }
-  return(tree.object$indices.per.leaf[[current.node[1,"Node"]]])
+  if(is.vector(tree.object$index)){
+    return(tree.object$index[tree.object$indices.per.leaf[[current.node[1,"Node"]]]])
+  }else{
+    return(tree.object$index[tree.object$indices.per.leaf[[current.node[1,"Node"]]],"idx"])
+  }
 }
 
 
